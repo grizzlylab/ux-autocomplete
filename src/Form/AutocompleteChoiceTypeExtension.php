@@ -104,10 +104,7 @@ final class AutocompleteChoiceTypeExtension extends AbstractTypeExtension
             'preload' => 'focus',
         ]);
 
-        // if autocomplete_url is passed, then HTML options are already supported
-        $resolver->setNormalizer('options_as_html', function (Options $options, $value) {
-            return null === $options['autocomplete_url'] ? $value : false;
-        });
+        $resolver->setAllowedTypes('options_as_html', 'bool');
 
         $resolver->setNormalizer('preload', function (Options $options, $value) {
             if (\is_bool($value)) {
