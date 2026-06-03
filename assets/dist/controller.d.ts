@@ -35,12 +35,24 @@ export default class extends Controller {
     connect(): void;
     disconnect(): void;
     private getMaxOptions;
+    /**
+     * Returns the element, but only if it's a select element.
+     */
     get selectElement(): HTMLSelectElement | null;
+    /**
+     * Getter to help typing.
+     */
     get formElement(): HTMLInputElement | HTMLSelectElement;
     private dispatchEvent;
     get preload(): string | boolean;
     private resetTomSelect;
     private changeTomSelectDisabledState;
+    /**
+     * TomSelect doesn't give us a way to update the placeholder, so most of
+     * this code is copied from TomSelect's source code.
+     *
+     * @private
+     */
     private updateTomSelectPlaceholder;
     private startMutationObserver;
     private stopMutationObserver;

@@ -15,12 +15,19 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ***************************************************************************** */
+/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
+
 
 function __classPrivateFieldGet(receiver, state, kind, f) {
     if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 }
+
+typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+};
 
 var _default_1_instances, _default_1_getCommonConfig, _default_1_createAutocomplete, _default_1_createAutocompleteWithHtmlContents, _default_1_createAutocompleteWithRemoteData, _default_1_stripTags, _default_1_mergeObjects, _default_1_createTomSelect;
 class default_1 extends Controller {
@@ -32,6 +39,11 @@ class default_1 extends Controller {
     }
     initialize() {
         if (this.requiresLiveIgnore()) {
+            // unfortunately, TomSelect does enough weird things that, for a
+            // multi select, if the HTML in the `<select>` element changes,
+            // we can't reliably update TomSelect to see those changes. So,
+            // as a workaround, we tell LiveComponents to entirely ignore trying
+            // to update this item
             this.element.setAttribute('data-live-ignore', '');
             if (this.element.id) {
                 const label = document.querySelector(`label[for="${this.element.id}"]`);
@@ -41,6 +53,8 @@ class default_1 extends Controller {
             }
         }
         else {
+            // for non-multiple selects, we use a MutationObserver to update
+            // the TomSelect instance if the options themselves change
             if (!this.mutationObserver) {
                 this.mutationObserver = new MutationObserver((mutations) => {
                     this.onMutations(mutations);
@@ -67,12 +81,18 @@ class default_1 extends Controller {
     getMaxOptions() {
         return this.selectElement ? this.selectElement.options.length : 50;
     }
+    /**
+     * Returns the element, but only if it's a select element.
+     */
     get selectElement() {
         if (!(this.element instanceof HTMLSelectElement)) {
             return null;
         }
         return this.element;
     }
+    /**
+     * Getter to help typing.
+     */
     get formElement() {
         if (!(this.element instanceof HTMLInputElement) && !(this.element instanceof HTMLSelectElement)) {
             throw new Error('Autocomplete Stimulus controller can only be used on an <input> or <select>.');
@@ -113,6 +133,12 @@ class default_1 extends Controller {
         }
         this.startMutationObserver();
     }
+    /**
+     * TomSelect doesn't give us a way to update the placeholder, so most of
+     * this code is copied from TomSelect's source code.
+     *
+     * @private
+     */
     updateTomSelectPlaceholder() {
         const input = this.element;
         let placeholder = input.getAttribute('placeholder') || input.getAttribute('data-placeholder');
@@ -124,7 +150,9 @@ class default_1 extends Controller {
         }
         if (placeholder) {
             this.stopMutationObserver();
+            // override settings so it's used again later
             this.tomSelect.settings.placeholder = placeholder;
+            // and set it right now
             this.tomSelect.control_input.setAttribute('placeholder', placeholder);
             this.startMutationObserver();
         }
@@ -155,6 +183,7 @@ class default_1 extends Controller {
         mutations.forEach((mutation) => {
             switch (mutation.type) {
                 case 'childList':
+                    // look for changes to any <option> elements - e.g. text
                     if (mutation.target instanceof HTMLOptionElement) {
                         if (mutation.target.value === '') {
                             changePlaceholder = true;
@@ -163,8 +192,10 @@ class default_1 extends Controller {
                         hasAnOptionChanged = true;
                         break;
                     }
+                    // look for new or removed <option> elements
                     mutation.addedNodes.forEach((node) => {
                         if (node instanceof HTMLOptionElement) {
+                            // check if a previously-removed is being added back
                             if (removedOptionElements.includes(node)) {
                                 removedOptionElements.splice(removedOptionElements.indexOf(node), 1);
                                 return;
@@ -174,6 +205,7 @@ class default_1 extends Controller {
                     });
                     mutation.removedNodes.forEach((node) => {
                         if (node instanceof HTMLOptionElement) {
+                            // check if a previously-added is being removed
                             if (addedOptionElements.includes(node)) {
                                 addedOptionElements.splice(addedOptionElements.indexOf(node), 1);
                                 return;
@@ -183,6 +215,7 @@ class default_1 extends Controller {
                     });
                     break;
                 case 'attributes':
+                    // look for changes to any <option> elements (e.g. value attribute)
                     if (mutation.target instanceof HTMLOptionElement) {
                         hasAnOptionChanged = true;
                         break;
@@ -193,6 +226,7 @@ class default_1 extends Controller {
                     }
                     break;
                 case 'characterData':
+                    // an alternative way for an option's text to change
                     if (mutation.target instanceof Text && mutation.target.parentElement instanceof HTMLOptionElement) {
                         if (mutation.target.parentElement.value === '') {
                             changePlaceholder = true;
@@ -218,6 +252,7 @@ class default_1 extends Controller {
 }
 _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _default_1_getCommonConfig() {
     const plugins = {};
+    // multiple values excepted if this is NOT A select (i.e. input) or a multiple select
     const isMultiple = !this.selectElement || this.selectElement.multiple;
     if (!this.formElement.disabled && !isMultiple) {
         plugins.clear_button = { title: '' };
@@ -237,9 +272,11 @@ _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _def
     const config = {
         render,
         plugins,
+        // clear the text input after selecting a value
         onItemAdd: () => {
             this.tomSelect.setTextboxValue('');
         },
+        // see initialize() method for explanation
         onInitialize: function () {
             if (requiresLiveIgnore) {
                 const tomSelect = this;
@@ -248,6 +285,7 @@ _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _def
         },
         closeAfterSelect: true,
     };
+    // for non-autocompleting input elements, avoid the "No results" message that always shows
     if (!this.selectElement && !this.urlValue) {
         config.shouldLoad = () => false;
     }
@@ -263,6 +301,7 @@ _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _def
         score: (search) => {
             const scoringFunction = this.tomSelect.getScoreFunction(search);
             return (item) => {
+                // strip HTML tags from each option's searchable text
                 return scoringFunction(Object.assign(Object.assign({}, item), { text: __classPrivateFieldGet(this, _default_1_instances, "m", _default_1_stripTags).call(this, item.text) }));
             };
         },
@@ -282,10 +321,14 @@ _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _def
             const separator = autocompleteEndpointUrl.includes('?') ? '&' : '?';
             return `${autocompleteEndpointUrl}${separator}query=${encodeURIComponent(query)}`;
         },
+        // VERY IMPORTANT: use 'function (query, callback) { ... }' instead of the
+        // '(query, callback) => { ... }' syntax because, otherwise,
+        // the 'this.XXX' calls inside this method fail
         load: function (query, callback) {
             const url = this.getUrl(query);
             fetch(url)
                 .then((response) => response.json())
+                // important: next_url must be set before invoking callback()
                 .then((json) => {
                 this.setNextUrl(query, json.next_page);
                 callback(json.results.options || json.results, json.results.optgroups || []);
@@ -293,30 +336,32 @@ _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _def
                 .catch(() => callback([], []));
         },
         shouldLoad: (query) => {
+            // if min length is specified, always use it
             if (null !== minCharacterLength) {
                 return query.length >= minCharacterLength;
             }
+            // otherwise, default to 3, but always load after the first request
+            // this gives nice behavior when the user deletes characters and
+            // goes below the minimum length, it will still load fresh choices
             if (this.hasLoadedChoicesPreviously) {
                 return true;
             }
+            // mark that the choices have loaded (but avoid initial load)
             if (query.length > 0) {
                 this.hasLoadedChoicesPreviously = true;
             }
             return query.length >= 3;
         },
         optgroupField: 'group_by',
+        // avoid extra filtering after results are returned
         score: function (search) {
             return function (item) {
                 return 1;
             };
         },
         render: {
-            option: (item, escape) => {
-                return `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`;
-            },
-            item: (item, escape) => {
-                return `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`;
-            },
+            option: (item, escape) => `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`,
+            item: (item, escape) => `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`,
             no_more_results: () => {
                 return `<div class="no-more-results">${this.noMoreResultsTextValue}</div>`;
             },
