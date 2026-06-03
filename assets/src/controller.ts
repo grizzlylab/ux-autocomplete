@@ -218,12 +218,10 @@ export default class extends Controller {
                 };
             },
             render: {
-                option: function (item: any) {
-                    return `<div>${item.text}</div>`;
-                },
-                item: function (item: any) {
-                    return `<div>${item.text}</div>`;
-                },
+                option: (item: any, escape: (str: string) => string) =>
+                    `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`,
+                item: (item: any, escape: (str: string) => string) =>
+                    `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`,
                 no_more_results: (): string => {
                     return `<div class="no-more-results">${this.noMoreResultsTextValue}</div>`;
                 },

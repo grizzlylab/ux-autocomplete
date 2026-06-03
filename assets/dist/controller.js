@@ -311,11 +311,11 @@ _default_1_instances = new WeakSet(), _default_1_getCommonConfig = function _def
             };
         },
         render: {
-            option: function (item) {
-                return `<div>${item.text}</div>`;
+            option: (item, escape) => {
+                return `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`;
             },
-            item: function (item) {
-                return `<div>${item.text}</div>`;
+            item: (item, escape) => {
+                return `<div>${this.optionsAsHtmlValue ? item.text : escape(item.text)}</div>`;
             },
             no_more_results: () => {
                 return `<div class="no-more-results">${this.noMoreResultsTextValue}</div>`;
